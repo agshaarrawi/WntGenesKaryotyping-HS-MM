@@ -1,0 +1,96 @@
+getwd()
+list.files()
+
+
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("regioneR")
+BiocManager::install("karyoploteR")
+
+install.packages("BSgenome", dependencies = TRUE)
+install.packages("biomartr")
+install.packages("ggplotify")
+install.packages("cowplot")
+
+
+library(biomaRt)
+library(regioneR)
+library(karyoploteR)
+library(BiocManager)
+library(ggplotify)
+library(cowplot)
+
+gene.symbols <- c("WNT1", "WNT2", "WNT2B", "WNT3", "WNT3A", "WNT4", "WNT5A", "WNT5B" ,"WNT6" ,"WNT7A", "WNT7B", "WNT8A", "WNT8B", "WNT9A", "WNT9B", "WNT10A", "WNT10B", "WNT11", "WNT16")
+
+ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+
+ensemblmm <- useEnsembl(biomart="ensembl", dataset="mmusculus_gene_ensembl")
+
+####
+mart = useEnsembl('genes')
+listgenes = listDatasets(mart)
+#####
+
+genes <- toGRanges(getBM(attributes=c('chromosome_name', 'start_position', 'end_position', 'hgnc_symbol'),
+                         filters = 'hgnc_symbol',uniqueRows = TRUE, values =gene.symbols, mart = ensembl))
+
+###
+listattri= listAttributes(ensemblmm) # select mgi_symbol for "mouse nomenclature home"
+genesmm <- toGRanges(getBM(attributes=c('chromosome_name', 'start_position', 'end_position', 'mgi_symbol'),
+                           filters = 'mgi_symbol', values =gene.symbols, mart = ensemblmm))
+
+
+
+
+seqlevelsStyle(genes) <- "UCSC"
+
+seqlevelsStyle(genesmm) <- "UCSC"
+
+
+head(genes)
+tail(genes)
+
+head(genesmm)
+tail(genesmm)
+
+### individual plots ######
+kp <- plotKaryotype(genome="hg38", plot.type = 1, main="Human hg38 genome")
+
+
+kpPlotMarkers(kp, data=genes ,labels=genes$hgnc_symbol, text.orientation = "horizontal",offset= 0.09, r1=0.5, cex=0.8, adjust.label.position = T,line.color= "Blue", clipping = F)
+
+
+kpmm <- plotKaryotype(genome="mm10", plot.type = 1, main="Mouse GRCm39 genome")
+
+kpPlotMarkers(kpmm, data=genesmm ,labels=genesmm$mgi_symbol, text.orientation = "horizontal",offset= 0.09, r1=0.5, cex=0.8, adjust.label.position = T, line.color= "Blue")
+
+
+
+
+######### GGplot ####
+pp <- getDefaultPlotParams(1)
+pp$topmargin <- 600
+pp$ideogramheight <- 100 # chromsome thickness
+#data1height <- 300
+#pp$rightmargin <- 150
+#pp$data1inmargin <- 150
+#pp$data1outmargin <- 150
+
+p1 <- as.ggplot(expression(kp <- plotKaryotype(genome="hg38", main="Human (hg38)", plot.params = pp, cex = 4), 
+                           kpAddBaseNumbers(kp, tick.dist = 10000000, tick.len = 10, tick.col="red", cex=1, minor.tick.dist = 1000000, minor.tick.len = 5, minor.tick.col = "gray"), 
+                           kpPlotMarkers(kp, data=genes ,labels=genes$hgnc_symbol, text.orientation = "horizontal" , offset= 0.09, r1=0.5, cex=2, adjust.label.position = T, marker.parts = c(0.2, 0.7, 0.1), line.color= "Blue", max.iter= 1000)))
+
+p2 <- as.ggplot(expression(kpmm <- plotKaryotype(genome="mm10", main="Mouse GRCm39", plot.params = pp, cex = 4),
+                           kpAddBaseNumbers(kpmm, tick.dist = 10000000, tick.len = 10, tick.col="red", cex=1, minor.tick.dist = 1000000, minor.tick.len = 5, minor.tick.col = "gray"), 
+                           kpPlotMarkers(kpmm, data=genesmm ,labels=genesmm$mgi_symbol, text.orientation = "horizontal",offset= 0.09, r1=0.5, cex=2, adjust.label.position = T, marker.parts = c(0.2, 2, 0.1), line.color= "Blue", max.iter= 1000)))
+save_plot("Multipanel_cowplot.pdf", plot_grid(p1, p2, ncol=2, labels=LETTERS[1:2], label_size = 70), base_height=50, base_width =125,limitsize = FALSE)
+
+# I need to test this
+save_plot("Multipanel_cowplot.svg", plot_grid(p1, p2, ncol=2, labels=LETTERS[1:2], label_size = 70), base_height=50, base_width =125,limitsize = FALSE)
+
+# instead of using a ggsave pakage
+ggsave2("Multipanel_cowplot.svg",device= svg,  plot_grid(p1, p2, ncol=2, labels=LETTERS[1:2], label_size = 70), height=50, width =125, units = "in",limitsize = FALSE)
+ggsave2("Multipanel_cowplot.png",device= png,  plot_grid(p1, p2, ncol=2, labels=LETTERS[1:2], label_size = 70), height=50, width =125, units = "in",limitsize = FALSE)
+
+
